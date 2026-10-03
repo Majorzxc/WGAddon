@@ -1,0 +1,19 @@
+name: WGRegionList
+version: '${version}'
+main: me.majorzxc.wgregionlist.WGRegionListPlugin
+api-version: '1.21'
+description: Дополнительные файлы регионов для WorldGuard с раскладкой по папкам миров
+author: Majorzxc
+depend: [WorldEdit, WorldGuard]
+
+commands:
+  wgregionlist:
+    description: Управление WGRegionList
+    usage: /<command> <reload|info|find|save>
+    aliases: [wgrl]
+    permission: wgregionlist.admin
+
+permissions:
+  wgregionlist.admin:
+    description: Доступ к командам WGRegionList
+    default: op

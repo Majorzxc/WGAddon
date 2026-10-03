@@ -1,0 +1,8 @@
+worlds:
+  world: main
+sync:
+  enabled: true
+  interval-seconds: 1
+  delete-removed: true
+restore-native-parents: true
+debug: true
