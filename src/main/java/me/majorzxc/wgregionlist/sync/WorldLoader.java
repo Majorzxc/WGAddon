@@ -43,13 +43,17 @@ final class WorldLoader {
     private final WorldGuardBridge bridge;
     private final RegionFactory factory;
     private final RegionFileReader reader = new RegionFileReader();
+    /** Ссылки на родителей из regions.yml WorldGuard, снятые до его запуска (см. StartupParents). */
+    private final Map<Path, Map<String, String>> startupParents;
 
-    WorldLoader(PluginLog log, Path dataFolder, Path regionsDir, WorldGuardBridge bridge, RegionFactory factory) {
+    WorldLoader(PluginLog log, Path dataFolder, Path regionsDir, WorldGuardBridge bridge, RegionFactory factory,
+                Map<Path, Map<String, String>> startupParents) {
         this.log = log;
         this.dataFolder = dataFolder;
         this.regionsDir = regionsDir;
         this.bridge = bridge;
         this.factory = factory;
+        this.startupParents = new HashMap<>(startupParents);
     }
 
     LoadSummary load(WorldState ws, RegionManager manager, Settings settings) {
@@ -304,15 +308,22 @@ final class WorldLoader {
             return 0;
         }
         Path file = bridge.worldGuardRegionsFile(manager.getName());
-        if (file == null || !Files.isRegularFile(file)) {
-            return 0;
+        if (file == null) {
+            return 0; // WorldGuard хранит регионы в базе данных
         }
-        Map<String, String> declared;
-        try {
-            declared = ParentKeyScanner.scan(file);
-        } catch (IOException e) {
-            problems.warn("не удалось прочитать " + file + " для восстановления родителей: " + e.getMessage());
-            return 0;
+        Map<String, String> declared = new HashMap<>();
+        if (Files.isRegularFile(file)) {
+            try {
+                declared.putAll(ParentKeyScanner.scan(file));
+            } catch (IOException e) {
+                problems.warn("не удалось прочитать " + file + " для восстановления родителей: " + e.getMessage());
+            }
+        }
+        // При первой загрузке мира добавляем ссылки, снятые до запуска WorldGuard: он мог
+        // уже переписать файл без них (например, при UUID-миграции)
+        Map<String, String> early = startupParents.remove(file.toAbsolutePath().normalize());
+        if (early != null) {
+            early.forEach(declared::putIfAbsent);
         }
         int restored = 0;
         for (Map.Entry<String, String> entry : declared.entrySet()) {

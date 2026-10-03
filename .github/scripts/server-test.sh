@@ -51,6 +51,9 @@ sleep 3
 
 echo "──── лог WGRegionList при запуске"
 grep -a "WGRegionList" "$LOG" | head -n 40
+echo "──── ошибки при запуске (WorldEdit/WorldGuard/WGRegionList)"
+grep -anE "ERROR|Exception|Could not load" "$LOG" | head -n 30
+check 'grep -aq "Enabling WorldGuard" "$LOG" && ! grep -aq "WorldGuard не включён" "$LOG"' "WorldGuard запустился"
 
 # ── 1. загрузка
 check 'grep -aq "\[world\] регионов аддона: 4 (файлов: 2)" "$LOG"' "загружено 4 региона из 2 файлов"

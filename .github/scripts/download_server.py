@@ -2,7 +2,7 @@
 """
 Скачивает Paper, WorldEdit и WorldGuard для интеграционного теста в CI.
 
-Использование: download_server.py <версия MC | latest> <версия WorldGuard | latest> <папка>
+Использование: download_server.py <версия MC | latest> <версия WorldGuard | latest> <папка> [префикс версии WorldEdit]
 """
 import io
 import json
@@ -73,7 +73,7 @@ def resolve_paper(mc):
     raise SystemExit("Не удалось найти сборку Paper")
 
 
-def modrinth(slug, mc):
+def modrinth(slug, mc, prefix=""):
     for loaders in (["paper"], ["bukkit"], ["spigot"]):
         query = urllib.parse.urlencode({"game_versions": json.dumps([mc]), "loaders": json.dumps(loaders)})
         try:
@@ -81,6 +81,7 @@ def modrinth(slug, mc):
         except Exception as error:  # noqa: BLE001
             print(f"Modrinth {slug}: {error}")
             return None
+        versions = [v for v in versions if v["version_number"].startswith(prefix)]
         releases = [v for v in versions if v.get("version_type") == "release"] or versions
         for version in releases:
             files = sorted(version["files"], key=lambda f: not f.get("primary"))
@@ -112,12 +113,16 @@ def enginehub(group, artifact, version):
 
 def main():
     mc, worldguard_version, target = sys.argv[1], sys.argv[2], sys.argv[3]
+    # WorldGuard 7.0.13 собран под WorldEdit 7.3.x — с WorldEdit 7.4 он не запускается
+    worldedit_prefix = sys.argv[4] if len(sys.argv) > 4 else ""
     mc, (paper_url, build) = resolve_paper(mc)
     print(f"Paper {mc} build {build}: {paper_url}")
     with open(f"{target}/paper.jar", "wb") as out:
         out.write(get(paper_url))
 
-    worldedit = modrinth("worldedit", mc) or enginehub("com/sk89q/worldedit", "worldedit-bukkit", "latest")
+    worldedit = modrinth("worldedit", mc, worldedit_prefix)
+    if worldedit is None and not worldedit_prefix:
+        worldedit = enginehub("com/sk89q/worldedit", "worldedit-bukkit", "latest")
     if worldedit is None:
         raise SystemExit("Не удалось скачать WorldEdit")
     with open(f"{target}/plugins/worldedit.jar", "wb") as out:

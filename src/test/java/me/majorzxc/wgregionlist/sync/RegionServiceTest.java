@@ -247,7 +247,7 @@ class RegionServiceTest {
 
         Settings settings = Settings.parse(Map.of("worlds", Map.of("world", List.of("main"))), warning -> { });
         service = new RegionService(new PluginLog(Logger.getLogger("WGRegionListTest")), data,
-                new WorldGuardBridge(Logger.getLogger("WGRegionListTest")));
+                new WorldGuardBridge(Logger.getLogger("WGRegionListTest")), Map.of());
         service.start(settings, 60);
 
         // ── 1. Загрузка
@@ -366,6 +366,29 @@ class RegionServiceTest {
         assertNotNull(world2.getRegion("spawn"));
         world2.save();
         assertNoAddonRegions(database(world2).everSaved);
+    }
+
+    @Test
+    void restoresParentsFromStartupSnapshot() throws Exception {
+        // WorldGuard при запуске уже переписал свой файл (UUID-миграция) и потерял parent у kid,
+        // но аддон успел снять ссылку в onLoad
+        RegionManager world = newManager("world", Set.of(
+                new ProtectedCuboidRegion("kid", BlockVector3.at(0, 0, 0), BlockVector3.at(5, 5, 5))));
+        loaded.add(world);
+        Path wgFile = wgWorlds.resolve("world/regions.yml");
+        write(wgFile, "regions:\n    kid: {type: cuboid, priority: 0}\n");
+        write(data.resolve("regions/main/a.yml"), "regions:\n  spawn: {type: global}\n");
+
+        Settings settings = Settings.parse(Map.of("worlds", Map.of("world", "main")), warning -> { });
+        service = new RegionService(new PluginLog(Logger.getLogger("WGRegionListTest")), data,
+                new WorldGuardBridge(Logger.getLogger("WGRegionListTest")),
+                Map.of(wgFile.toAbsolutePath().normalize(), Map.of("kid", "spawn")));
+        service.start(settings, 60);
+
+        assertSame(world.getRegion("spawn"), world.getRegion("kid").getParent());
+        world.save();
+        assertEquals("spawn", database(world).stored.iterator().next().getParent().getId(),
+                "WorldGuard сохранит восстановленную связь");
     }
 
     private static Set<String> ids(Set<ProtectedRegion> regions) {

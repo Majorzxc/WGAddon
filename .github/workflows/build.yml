@@ -46,9 +46,11 @@ jobs:
         include:
           - minecraft: 1.21.4
             worldguard: 7.0.13
+            worldedit: "7.3."
             java: 21
           - minecraft: latest
             worldguard: latest
+            worldedit: ""
             java: 25
     steps:
       - uses: actions/checkout@v4
@@ -63,7 +65,7 @@ jobs:
       - name: Скачивание Paper, WorldEdit, WorldGuard
         run: |
           mkdir -p run/plugins
-          python3 .github/scripts/download_server.py "${{ matrix.minecraft }}" "${{ matrix.worldguard }}" run
+          python3 .github/scripts/download_server.py "${{ matrix.minecraft }}" "${{ matrix.worldguard }}" run "${{ matrix.worldedit }}"
       - name: Интеграционный тест
         run: bash .github/scripts/server-test.sh run
       - uses: actions/upload-artifact@v4

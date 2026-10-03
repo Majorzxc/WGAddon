@@ -4,10 +4,12 @@ import me.majorzxc.wgregionlist.command.WgrlCommand;
 import me.majorzxc.wgregionlist.config.Settings;
 import me.majorzxc.wgregionlist.listener.WorldListener;
 import me.majorzxc.wgregionlist.sync.RegionService;
+import me.majorzxc.wgregionlist.sync.StartupParents;
 import me.majorzxc.wgregionlist.util.PluginLog;
 import me.majorzxc.wgregionlist.wg.WorldGuardBridge;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.IllegalPluginAccessException;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.IOException;
@@ -31,10 +33,29 @@ public final class WGRegionListPlugin extends JavaPlugin {
     private PluginLog log;
     private RegionService service;
     private volatile Settings settings;
+    private Map<Path, Map<String, String>> startupParents = Map.of();
+
+    @Override
+    public void onLoad() {
+        log = new PluginLog(getLogger());
+        // onLoad выполняется до включения любых плагинов — WorldGuard ещё не трогал свои файлы
+        Plugin worldGuard = getServer().getPluginManager().getPlugin("WorldGuard");
+        if (worldGuard != null) {
+            startupParents = StartupParents.capture(worldGuard.getDataFolder().toPath().resolve("worlds"), log);
+        }
+    }
 
     @Override
     public void onEnable() {
-        log = new PluginLog(getLogger());
+        if (log == null) {
+            log = new PluginLog(getLogger());
+        }
+        if (!getServer().getPluginManager().isPluginEnabled("WorldGuard")) {
+            log.error("WorldGuard не включён (ошибка при его запуске — см. выше в консоли). "
+                    + "Проверьте, что версии WorldGuard и WorldEdit подходят к версии сервера. WGRegionList отключён");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
         Path dataFolder = getDataFolder().toPath();
         saveDefaultConfig();
         if (!Files.exists(dataFolder.resolve("regions"))) {
@@ -53,7 +74,8 @@ public final class WGRegionListPlugin extends JavaPlugin {
         }
 
         try {
-            service = new RegionService(log, dataFolder, new WorldGuardBridge(getLogger()));
+            service = new RegionService(log, dataFolder, new WorldGuardBridge(getLogger()), startupParents);
+            startupParents = Map.of();
             service.start(initial, STARTUP_TIMEOUT_SECONDS);
         } catch (LinkageError | RuntimeException e) {
             log.error("Не удалось подключиться к WorldGuard — проверьте, что установлены WorldGuard 7.0.13+ "

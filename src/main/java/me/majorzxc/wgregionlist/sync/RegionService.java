@@ -71,13 +71,18 @@ public final class RegionService {
     /** Отсортированные ID регионов аддона — для подсказок команд (читаются из основного потока). */
     private volatile List<String> knownIds = List.of();
 
-    public RegionService(PluginLog log, Path dataFolder, WorldGuardBridge bridge) {
+    /**
+     * @param startupParents ссылки на родителей из regions.yml WorldGuard, снятые до его запуска
+     *                       ({@link StartupParents#capture}); может быть пустой картой
+     */
+    public RegionService(PluginLog log, Path dataFolder, WorldGuardBridge bridge,
+                         Map<Path, Map<String, String>> startupParents) {
         this.log = log;
         this.dataFolder = dataFolder;
         this.regionsDir = dataFolder.resolve("regions");
         this.bridge = bridge;
         RegionFactory factory = new RegionFactory(bridge.flagRegistry());
-        this.loader = new WorldLoader(log, dataFolder, regionsDir, bridge, factory);
+        this.loader = new WorldLoader(log, dataFolder, regionsDir, bridge, factory, startupParents);
         this.synchronizer = new ChangeSynchronizer(log, dataFolder, bridge, factory);
         this.worker = Executors.newSingleThreadScheduledExecutor(runnable -> {
             Thread thread = new Thread(runnable, "WGRegionList-Worker");
