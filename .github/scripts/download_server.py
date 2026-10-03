@@ -12,6 +12,8 @@ import urllib.parse
 import urllib.request
 import zipfile
 
+WORLDEDIT_CLASS = "com/sk89q/worldedit/WorldEdit.class"
+WORLDGUARD_CLASS = "com/sk89q/worldguard/WorldGuard.class"
 HEADERS = {"User-Agent": "WGRegionList-CI (https://github.com/Majorzxc/WGAddon)"}
 
 
@@ -29,12 +31,13 @@ def version_key(version):
     return tuple(int(part) for part in re.findall(r"\d+", version))
 
 
-def is_plugin(data):
+def is_plugin(data, required_class):
+    """Готовый jar плагина: есть plugin.yml и встроены классы ядра (не «тонкий» jar из Maven)."""
     try:
-        names = zipfile.ZipFile(io.BytesIO(data)).namelist()
+        names = set(zipfile.ZipFile(io.BytesIO(data)).namelist())
     except zipfile.BadZipFile:
         return False
-    return "plugin.yml" in names or "paper-plugin.yml" in names
+    return ("plugin.yml" in names or "paper-plugin.yml" in names) and required_class in names
 
 
 def paper_versions():
@@ -73,9 +76,12 @@ def resolve_paper(mc):
     raise SystemExit("Не удалось найти сборку Paper")
 
 
-def modrinth(slug, mc, prefix=""):
+def modrinth(slug, mc, required_class, prefix=""):
     for loaders in (["paper"], ["bukkit"], ["spigot"]):
-        query = urllib.parse.urlencode({"game_versions": json.dumps([mc]), "loaders": json.dumps(loaders)})
+        params = {"loaders": json.dumps(loaders)}
+        if mc:
+            params["game_versions"] = json.dumps([mc])
+        query = urllib.parse.urlencode(params)
         try:
             versions = get_json(f"https://api.modrinth.com/v2/project/{slug}/version?{query}")
         except Exception as error:  # noqa: BLE001
@@ -87,13 +93,13 @@ def modrinth(slug, mc, prefix=""):
             files = sorted(version["files"], key=lambda f: not f.get("primary"))
             for file in files:
                 data = get(file["url"])
-                if is_plugin(data):
+                if is_plugin(data, required_class):
                     print(f"{slug}: {version['version_number']} ({file['filename']}) — Modrinth")
                     return data
     return None
 
 
-def enginehub(group, artifact, version):
+def enginehub(group, artifact, version, required_class):
     base = f"https://maven.enginehub.org/repo/{group}/{artifact}"
     if version == "latest":
         metadata = get(f"{base}/maven-metadata.xml").decode()
@@ -105,7 +111,7 @@ def enginehub(group, artifact, version):
         except Exception as error:  # noqa: BLE001
             print(f"{url}: {error}")
             continue
-        if is_plugin(data):
+        if is_plugin(data, required_class):
             print(f"{artifact}: {version} — {url}")
             return data
     return None
@@ -120,20 +126,23 @@ def main():
     with open(f"{target}/paper.jar", "wb") as out:
         out.write(get(paper_url))
 
-    worldedit = modrinth("worldedit", mc, worldedit_prefix)
+    worldedit = modrinth("worldedit", mc, WORLDEDIT_CLASS, worldedit_prefix)
     if worldedit is None and not worldedit_prefix:
-        worldedit = enginehub("com/sk89q/worldedit", "worldedit-bukkit", "latest")
+        worldedit = enginehub("com/sk89q/worldedit", "worldedit-bukkit", "latest", WORLDEDIT_CLASS)
     if worldedit is None:
         raise SystemExit("Не удалось скачать WorldEdit")
     with open(f"{target}/plugins/worldedit.jar", "wb") as out:
         out.write(worldedit)
 
-    if worldguard_version == "latest":
-        worldguard = modrinth("worldguard", mc) or enginehub("com/sk89q/worldguard", "worldguard-bukkit", "latest")
-    else:
-        worldguard = enginehub("com/sk89q/worldguard", "worldguard-bukkit", worldguard_version)
+    prefix = "" if worldguard_version == "latest" else worldguard_version
+    worldguard = modrinth("worldguard", mc, WORLDGUARD_CLASS, prefix)
+    if worldguard is None and prefix:
+        # Версия могла быть не отмечена нужной версией игры — ищем точную версию без фильтра
+        worldguard = modrinth("worldguard", None, WORLDGUARD_CLASS, prefix)
     if worldguard is None:
-        raise SystemExit("Не удалось скачать WorldGuard")
+        worldguard = enginehub("com/sk89q/worldguard", "worldguard-bukkit", worldguard_version, WORLDGUARD_CLASS)
+    if worldguard is None:
+        raise SystemExit(f"Не удалось скачать WorldGuard {worldguard_version}")
     with open(f"{target}/plugins/worldguard.jar", "wb") as out:
         out.write(worldguard)
 
