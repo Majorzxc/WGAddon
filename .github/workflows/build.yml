@@ -1,0 +1,80 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Сборка и тесты
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Сборка
+        run: ./gradlew build --no-daemon --stacktrace
+      - name: Отчёт тестов
+        if: always()
+        run: |
+          for f in build/test-results/test/*.xml; do
+            [ -f "$f" ] && grep -o 'testsuite name="[^"]*" tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' "$f"
+          done || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports
+          path: build/reports/tests/
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WGRegionList
+          path: build/libs/WGRegionList-*.jar
+
+  server-test:
+    name: Сервер Paper ${{ matrix.minecraft }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - minecraft: 1.21.4
+            worldguard: 7.0.13
+            worldedit: "7.3."
+            java: 21
+          - minecraft: latest
+            worldguard: latest
+            worldedit: ""
+            java: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: WGRegionList
+          path: build/libs
+      - name: Скачивание Paper, WorldEdit, WorldGuard
+        run: |
+          mkdir -p run/plugins
+          python3 .github/scripts/download_server.py "${{ matrix.minecraft }}" "${{ matrix.worldguard }}" run "${{ matrix.worldedit }}"
+      - name: Интеграционный тест
+        run: bash .github/scripts/server-test.sh run
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: server-log-${{ matrix.minecraft }}
+          path: |
+            run/server.log
+            run/plugins/WGRegionList/
+            run/plugins/WorldGuard/worlds/
+          if-no-files-found: ignore

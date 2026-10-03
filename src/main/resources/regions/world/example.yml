@@ -1,0 +1,36 @@
+# Пример файла регионов WGRegionList для мира "world".
+# Файлов в папке может быть сколько угодно, с любыми именами (*.yml / *.yaml),
+# в том числе во вложенных папках. Файлы, имя которых начинается с точки, пропускаются.
+#
+# Формат такой же, как у plugins/WorldGuard/worlds/<мир>/regions.yml —
+# регионы можно просто переносить оттуда (вырезать из WorldGuard и вставить сюда).
+# ID регионов не должны повторяться в пределах одного мира — ни между файлами,
+# ни с регионами самого WorldGuard (при совпадении приоритет у WorldGuard).
+#
+# Раскомментируйте пример и выполните /wgrl reload.
+
+#regions:
+#  example_spawn:
+#    type: cuboid                       # cuboid | poly2d | global
+#    min: {x: -50, y: -64, z: -50}
+#    max: {x: 50, y: 320, z: 50}
+#    priority: 10                       # необязательно, по умолчанию 0
+#    flags:
+#      pvp: deny
+#      greeting: 'Добро пожаловать на спавн!'
+#    owners:
+#      players: []
+#      unique-ids: []
+#      groups: [admin]
+#    members: {}
+#
+#  example_shop:
+#    type: poly2d
+#    min-y: 60
+#    max-y: 90
+#    points:
+#    - {x: 10, z: 10}
+#    - {x: 30, z: 10}
+#    - {x: 20, z: 30}
+#    flags: {build: deny}
+#    parent: example_spawn              # родитель может быть в любом файле или в самом WorldGuard

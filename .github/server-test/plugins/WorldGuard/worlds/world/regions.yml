@@ -1,0 +1,18 @@
+regions:
+    native_root:
+        min: {x: 300.0, y: 0.0, z: 300.0}
+        max: {x: 310.0, y: 10.0, z: 310.0}
+        members: {}
+        flags: {}
+        owners: {}
+        type: cuboid
+        priority: 0
+    native_kid:
+        min: {x: 1.0, y: 1.0, z: 1.0}
+        max: {x: 2.0, y: 2.0, z: 2.0}
+        members: {}
+        flags: {}
+        owners: {}
+        type: cuboid
+        priority: 0
+        parent: test_spawn

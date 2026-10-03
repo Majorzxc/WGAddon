@@ -1,0 +1,6 @@
+regions:
+  test_nested:
+    type: cuboid
+    min: {x: 200, y: 0, z: 200}
+    max: {x: 210, y: 10, z: 210}
+    parent: native_root
